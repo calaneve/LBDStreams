@@ -64,7 +64,7 @@
 
     const parameterSelect = document.getElementById('parameterSelect');
     const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vROJntSYDQdg2vU1VTlMy8E-qOsSe9wr5_JMj1n1ks2wonNsk-JippjXmzizJJ9_BfgwMzzBV0Af50h/pub?gid=61075690&single=true&output=csv";
-    const geojsonUrl = "https://calaneve.github.io/streammap/LBD_ReachCharacterization_GCSWGS84.geojson"; // Replace this
+    const geojsonUrl = "https://calaneve.github.io/streammap/LBD_ReachCharacterization_GCSWGS84.geojson";
 
     let gradeData = {};
     let gradeColumns = [];
@@ -89,7 +89,9 @@
       const rows = text.trim().split('\n').map(row => row.split(','));
       const headers = rows[0].map(h => h.trim());
 
-      gradeColumns = headers.filter(h => !['reach', 'reach_id', 'geometry'].includes(h));
+      const skipColumns = ['reach', 'reach_id', 'geometry', 'stream'];
+      gradeColumns = headers.filter(h => !skipColumns.includes(h));
+
       const data = rows.slice(1).map(row => {
         const obj = {};
         headers.forEach((key, i) => obj[key] = row[i]?.trim());
@@ -126,7 +128,8 @@
         filter: feature => {
           const row = gradeData[feature.properties.reach_id];
           if (!row) return false;
-          return activeGrades.includes(row[selectedParam] || 'No Data');
+          const grade = row[selectedParam] || 'No Data';
+          return activeGrades.includes(grade);
         },
         style: feature => {
           const row = gradeData[feature.properties.reach_id];
@@ -140,7 +143,7 @@
           const row = gradeData[feature.properties.reach_id];
           if (row) {
             const grade = row[selectedParam] || 'No Data';
-            layer.bindPopup(`<strong>\${row.reach}</strong><br>\${selectedParam}: <strong>\${grade}</strong>`);
+            layer.bindPopup(`<strong>${row.reach}</strong><br>${selectedParam}: <strong>${grade}</strong>`);
           }
         }
       }).addTo(map);
