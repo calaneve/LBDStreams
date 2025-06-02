@@ -138,15 +138,29 @@
             weight: 5
           };
         },
-        onEachFeature: (feature, layer) => {
-          const row = gradeData[feature.properties.reach_id];
-          if (row) {
-            const grade = row[selectedParam] || 'No Data';
-            layer.bindPopup(`<strong>${row.reach}</strong><br>${selectedParam}: <strong>${grade}</strong>`);
-          }
-        }
-      }).addTo(map);
-    }
+       onEachFeature: (feature, layer) => {
+layer.on("mouseover", function () {
+  const id = feature.properties.reach_id;
+  const record = reachGrades[id];
+  if (!record) return;
+
+let popupContent = `<strong>Reach ID: ${id}</strong><br><table style="border-collapse: collapse;">`;
+for (const key in record) {
+  if (key !== "reach" && key !== "color" && key !== "grade") {
+    const grade = record[key];
+    const isSelected = key === selectedColumn;
+    const keyStyled = isSelected ? `<strong style="color:blue;">${key}</strong>` : key;
+    const gradeStyled = isSelected ? `<strong style="color:blue;">${grade}</strong>` : grade;
+    popupContent += `<tr><td style="padding: 2px 6px;">${keyStyled}</td><td style="padding: 2px 6px;">=</td><td style="padding: 2px 6px;">${gradeStyled}</td></tr>`;
+  }
+}
+popupContent += `</table>`;
+  layer.bindTooltip(popupContent, { sticky: true }).openTooltip();
+});
+    layer.on("mouseout", function () {
+      layer.closeTooltip();
+    });
+  }
 
     async function initialize() {
       await fetchCSV();
