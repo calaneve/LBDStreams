@@ -30,6 +30,15 @@
       margin-right: 6px;
       vertical-align: middle;
     }
+    .search-box {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 6px;
+      border: 1px solid #ccc;
+    }
   </style>
 </head>
 <body>
@@ -55,6 +64,10 @@
     <div><span class="legend-color" style="background:gray;"></span> No Data</div>
   </div>
 
+  <div class="search-box">
+    <input id="reachSearch" type="text" placeholder="Search Reach ID" style="width:160px; padding:4px;">
+  </div>
+
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -69,6 +82,7 @@
     let gradeData = {};
     let gradeColumns = [];
     let geojsonLayer;
+    let highlightedLayer;
 
     function getColor(grade) {
       switch (grade) {
@@ -164,6 +178,33 @@
       }).addTo(map);
     }
 
+    document.getElementById('reachSearch').addEventListener('input', function () {
+      const query = this.value.trim();
+
+      if (highlightedLayer) {
+        map.removeLayer(highlightedLayer);
+        highlightedLayer = null;
+      }
+
+      if (!query) return;
+
+      const selectedFeature = geojsonLayer.getLayers().find(layer => {
+        return layer.feature.properties.reach_id === query;
+      });
+
+      if (selectedFeature) {
+        highlightedLayer = L.geoJSON(selectedFeature.feature, {
+          style: {
+            color: 'blue',
+            weight: 6
+          }
+        }).addTo(map);
+
+        selectedFeature.openPopup();
+        map.fitBounds(highlightedLayer.getBounds());
+      }
+    });
+
     async function initialize() {
       await fetchCSV();
       await updateMap();
@@ -187,5 +228,4 @@
   </script>
 </body>
 </html>
-
 
