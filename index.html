@@ -16,9 +16,8 @@
       font-family: sans-serif;
     }
     #controls {
-      right: 20px
       top: 10px;
-      left: 10px;
+      right: 10px;
     }
     #legend {
       bottom: 10px;
@@ -154,14 +153,14 @@
       await fetchCSV();
       await updateMap();
     }
-// Add CEA Boundary to the map
-fetch("https://calaneve.github.io/streammap/LBD_CEA_Boundary.geojson")
-  .then(res => res.json())
-  .then(data => {
-    ceaLayer = L.geoJSON(data, {
-      style: { color: "purple", weight: 2, fillOpacity: 0, fill: false }
-    }).addTo(map);
-  });
+
+    fetch("https://calaneve.github.io/streammap/LBD_CEA_Boundary.geojson")
+      .then(res => res.json())
+      .then(data => {
+        L.geoJSON(data, {
+          style: { color: "purple", weight: 2, fillOpacity: 0, fill: false }
+        }).addTo(map);
+      });
 
     parameterSelect.addEventListener('change', updateMap);
     document.querySelectorAll('.gradeFilter').forEach(cb =>
