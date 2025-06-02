@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     #map { height: 100vh; }
-    #controls, #legend {
+    #controls, #legend, .search-box {
       position: absolute;
       z-index: 1000;
       background: white;
@@ -16,7 +16,7 @@
       font-family: sans-serif;
     }
     #controls {
-      top: 10px;
+      top: 60px;
       right: 10px;
     }
     #legend {
@@ -66,7 +66,7 @@
 
   <div class="search-box">
     <input id="reachSearch" type="text" placeholder="Search Reach ID" style="width:160px; padding:4px;">
-  </div>
+</div>
 
   <div id="map"></div>
 
