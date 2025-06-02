@@ -89,8 +89,7 @@
       const rows = text.trim().split('\n').map(row => row.split(','));
       const headers = rows[0].map(h => h.trim());
 
-      const skipColumns = ['reach', 'reach_id', 'geometry', 'stream'];
-      gradeColumns = headers.filter(h => !skipColumns.includes(h));
+      gradeColumns = headers.slice(2); // Skip Col1 and Col2
 
       const data = rows.slice(1).map(row => {
         const obj = {};
@@ -157,9 +156,10 @@
     fetch("https://calaneve.github.io/streammap/LBD_CEA_Boundary.geojson")
       .then(res => res.json())
       .then(data => {
-        L.geoJSON(data, {
+        const ceaLayer = L.geoJSON(data, {
           style: { color: "purple", weight: 2, fillOpacity: 0, fill: false }
         }).addTo(map);
+        map.fitBounds(ceaLayer.getBounds());
       });
 
     parameterSelect.addEventListener('change', updateMap);
@@ -171,3 +171,6 @@
   </script>
 </body>
 </html>
+
+
+
