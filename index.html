@@ -186,17 +186,41 @@
       }).addTo(map);
     }
 
-    document.getElementById('reachSearch').addEventListener('input', function () {
-      const query = this.value.trim().toLowerCase();
-      if (highlightedLayer) {
-        map.removeLayer(highlightedLayer);
-        highlightedLayer = null;
+  document.getElementById('reachSearch').addEventListener('input', function () {
+    const query = this.value.trim().toLowerCase();
+    if (highlightedLayer) {
+      map.removeLayer(highlightedLayer);
+      highlightedLayer = null;
+    }
+    if (!query) return;
+
+    const matches = geojsonLayer.getLayers().filter(l =>
+      l.feature.properties.reach_id.toLowerCase().includes(query)
+    );
+
+    if (matches.length === 0) return;
+
+    const matchedFeatures = matches.map(m => m.feature);
+    highlightedLayer = L.geoJSON(matchedFeatures, {
+      style: { color: 'blue', weight: 6 },
+      onEachFeature: (feature, layer) => {
+        const rec = gradeData[feature.properties.reach_id];
+        if (!rec) return;
+        let content = `<strong>Reach ID: ${feature.properties.reach_id}</strong><br><table style="border-collapse: collapse;">`;
+        for (const key in rec) {
+          if (key !== "reach" && key !== "color" && key !== "grade") {
+            const val = rec[key] || 'No Data';
+            const highlight = key === parameterSelect.value;
+            content += `<tr><td style="padding:2px 6px;">${highlight ? `<strong style='color:blue;'>${key}</strong>` : key}</td><td>=</td><td style="padding:2px 6px;">${highlight ? `<strong style='color:blue;'>${val}</strong>` : val}</td></tr>`;
+          }
+        }
+        layer.bindTooltip(content + '</table>', { sticky: true });
       }
-      if (!query) return;
-      const matches = geojsonLayer.getLayers().filter(l => l.feature.properties.reach_id.toLowerCase().includes(query));
-      highlightedLayer = L.geoJSON(matches.map(m => m.feature), { style: { color: 'blue', weight: 6 } }).addTo(map);
-      matches.forEach(m => m.openTooltip());
-    });
+    }).addTo(map);
+
+    matches.forEach(m => m.closeTooltip()); // Close existing tooltips
+    highlightedLayer.eachLayer(layer => layer.openTooltip());
+  });
 
     fetch(subwatershedUrl).then(res => res.json()).then(data => {
       subwatershedLayer = L.geoJSON(data, {
