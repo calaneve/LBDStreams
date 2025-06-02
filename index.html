@@ -15,10 +15,10 @@
       border: 1px solid #ccc;
       font-family: sans-serif;
     }
-    #controls { top: 60px; right: 10px; }
+    #controls { top: 60px; right: 10px; width: 220px; }
     #legend { bottom: 10px; left: 10px; }
     #subwatershedToggle { bottom: 180px; left: 10px; }
-    #subLegend { bottom: 210px; left: 10px; display: none; }
+    #subLegend { bottom: 220px; left: 10px; display: none; }
     .search-box { top: 10px; right: 10px; }
     .legend-color {
       display: inline-block;
@@ -28,24 +28,32 @@
       vertical-align: middle;
     }
     #updateButton {
-  position: absolute;
-  top: 10px;
-  left: 200px;
-  z-index: 1001;
-  background: #007bff;
-  color: white;
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: sans-serif;
-  font-size: 14px;
-}
-
-#updateButton:hover {
-  background: #0056b3;
-}
-
+      width: 100%;
+      background: #007bff;
+      color: white;
+      padding: 6px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: sans-serif;
+      font-size: 14px;
+      margin-top: 8px;
+    }
+    #updateButton:hover {
+      background: #0056b3;
+    }
+    #loading {
+      display: none;
+      position: absolute;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      background: white;
+      padding: 8px;
+      border: 1px solid #ccc;
+      font-family: sans-serif;
+    }
   </style>
 </head>
 <body>
@@ -63,7 +71,10 @@
     <label><input type="checkbox" class="gradeFilter" value="D" checked> D</label>
     <label><input type="checkbox" class="gradeFilter" value="F" checked> F</label>
     <label><input type="checkbox" class="gradeFilter" value="No Data" checked> No Data</label>
+    <button id="updateButton" onclick="handleUpdate()">Update Data</button>
   </div>
+
+  <div id="loading">Updating...</div>
 
   <div id="subwatershedToggle">
     <label><input type="checkbox" id="toggleSubwatersheds"> Subwatersheds</label>
@@ -89,9 +100,6 @@
     <div><span class="legend-color" style="background:red;"></span> F</div>
     <div><span class="legend-color" style="background:gray;"></span> No Data</div>
   </div>
-
-<div id="updateButton" onclick="handleUpdate()">Update Data</div>
-<div id="loading" style="display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1001;background:white;padding:8px;border:1px solid #ccc;font-family:sans-serif;">Updating...</div>
 
   <div id="map"></div>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -209,27 +217,26 @@
     });
 
     fetch("https://calaneve.github.io/streammap/LBD_CEA_Boundary.geojson")
-  .then(res => res.json())
-  .then(data => {
-    const ceaLayer = L.geoJSON(data, {
-      style: { color: "purple", weight: 2, fill: false, fillOpacity: 0 }
-    }).addTo(map);
-    map.fitBounds(ceaLayer.getBounds());
-  });
-
+      .then(res => res.json())
+      .then(data => {
+        const ceaLayer = L.geoJSON(data, {
+          style: { color: "purple", weight: 2, fill: false, fillOpacity: 0 }
+        }).addTo(map);
+        map.fitBounds(ceaLayer.getBounds());
+      });
 
     parameterSelect.addEventListener('change', updateMap);
     document.querySelectorAll('.gradeFilter').forEach(cb => cb.addEventListener('change', updateMap));
     fetchCSV().then(updateMap);
 
     async function handleUpdate() {
-  document.getElementById('loading').style.display = 'block';
-  const previousParam = parameterSelect.value;
-  await fetchCSV();
-  parameterSelect.value = previousParam; // preserve selection
-  await updateMap();
-  document.getElementById('loading').style.display = 'none';
-}
+      document.getElementById('loading').style.display = 'block';
+      const previousParam = parameterSelect.value;
+      await fetchCSV();
+      parameterSelect.value = previousParam;
+      await updateMap();
+      document.getElementById('loading').style.display = 'none';
+    }
   </script>
 </body>
 </html>
