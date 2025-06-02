@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Reach Grades Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 100vh; }
+    #controls, #legend {
+      position: absolute;
+      z-index: 1000;
+      background: white;
+      padding: 8px;
+      border: 1px solid #ccc;
+      font-family: sans-serif;
+    }
+    #controls {
+      top: 10px;
+      left: 10px;
+    }
+    #legend {
+      bottom: 10px;
+      left: 10px;
+    }
+    .legend-color {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <label for="parameterSelect"><strong>Select Parameter:</strong></label><br>
+    <select id="parameterSelect"></select><br><br>
+    <strong>Show Grades:</strong><br>
+    <label><input type="checkbox" class="gradeFilter" value="A" checked> A</label>
+    <label><input type="checkbox" class="gradeFilter" value="B" checked> B</label>
+    <label><input type="checkbox" class="gradeFilter" value="C" checked> C</label>
+    <label><input type="checkbox" class="gradeFilter" value="D" checked> D</label>
+    <label><input type="checkbox" class="gradeFilter" value="F" checked> F</label>
+    <label><input type="checkbox" class="gradeFilter" value="No Data" checked> No Data</label>
+  </div>
+
+  <div id="legend">
+    <strong>Grade Legend</strong><br>
+    <div><span class="legend-color" style="background:#1a9850;"></span> A</div>
+    <div><span class="legend-color" style="background:#91cf60;"></span> B</div>
+    <div><span class="legend-color" style="background:#d9ef8b;"></span> C</div>
+    <div><span class="legend-color" style="background:#fee08b;"></span> D</div>
+    <div><span class="legend-color" style="background:#d73027;"></span> F</div>
+    <div><span class="legend-color" style="background:#cccccc;"></span> No Data</div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([39.6, -104.8], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    const parameterSelect = document.getElementById('parameterSelect');
+    const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vROJntSYDQdg2vU1VTlMy8E-qOsSe9wr5_JMj1n1ks2wonNsk-JippjXmzizJJ9_BfgwMzzBV0Af50h/pub?gid=61075690&single=true&output=csv";
+    const geojsonUrl = "https://raw.githubusercontent.com/your-username/your-repo/main/stream_reaches.geojson"; // Replace this
+
+    let gradeData = {};
+    let gradeColumns = [];
+    let geojsonLayer;
+
+    function getColor(grade) {
+      switch (grade) {
+        case 'A': return '#1a9850';
+        case 'B': return '#91cf60';
+        case 'C': return '#d9ef8b';
+        case 'D': return '#fee08b';
+        case 'F': return '#d73027';
+        case 'No Data':
+        case '': return '#cccccc';
+        default: return '#cccccc';
+      }
+    }
+
+    async function fetchCSV() {
+      const response = await fetch(csvUrl);
+      const text = await response.text();
+      const rows = text.trim().split('\n').map(row => row.split(','));
+      const headers = rows[0].map(h => h.trim());
+
+      gradeColumns = headers.filter(h => !['reach', 'reach_id', 'geometry'].includes(h));
+      const data = rows.slice(1).map(row => {
+        const obj = {};
+        headers.forEach((key, i) => obj[key] = row[i]?.trim());
+        return obj;
+      });
+
+      gradeData = {};
+      data.forEach(row => {
+        gradeData[row.reach_id] = row;
+      });
+
+      parameterSelect.innerHTML = gradeColumns.map(col =>
+        `<option value="\${col}">\${col}</option>`
+      ).join('');
+    }
+
+    async function loadGeoJSON() {
+      const response = await fetch(geojsonUrl);
+      return await response.json();
+    }
+
+    function getActiveGradeFilters() {
+      return Array.from(document.querySelectorAll('.gradeFilter:checked')).map(cb => cb.value);
+    }
+
+    async function updateMap() {
+      if (geojsonLayer) map.removeLayer(geojsonLayer);
+
+      const selectedParam = parameterSelect.value;
+      const activeGrades = getActiveGradeFilters();
+      const geojson = await loadGeoJSON();
+
+      geojsonLayer = L.geoJSON(geojson, {
+        filter: feature => {
+          const row = gradeData[feature.properties.reach_id];
+          if (!row) return false;
+          return activeGrades.includes(row[selectedParam] || 'No Data');
+        },
+        style: feature => {
+          const row = gradeData[feature.properties.reach_id];
+          const grade = row ? row[selectedParam] : 'No Data';
+          return {
+            color: getColor(grade),
+            weight: 5
+          };
+        },
+        onEachFeature: (feature, layer) => {
+          const row = gradeData[feature.properties.reach_id];
+          if (row) {
+            const grade = row[selectedParam] || 'No Data';
+            layer.bindPopup(`<strong>\${row.reach}</strong><br>\${selectedParam}: <strong>\${grade}</strong>`);
+          }
+        }
+      }).addTo(map);
+    }
+
+    async function initialize() {
+      await fetchCSV();
+      await updateMap();
+    }
+
+    parameterSelect.addEventListener('change', updateMap);
+    document.querySelectorAll('.gradeFilter').forEach(cb =>
+      cb.addEventListener('change', updateMap)
+    );
+
+    initialize();
+  </script>
+</body>
+</html>
