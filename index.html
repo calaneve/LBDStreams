@@ -15,12 +15,8 @@
       border: 1px solid #ccc;
       font-family: sans-serif;
     }
-    .search-box {
-      top: 10px;
-      right: 10px;
-    }
     #controls {
-      top: 60px;
+      top: 90px;
       right: 10px;
     }
     #legend {
@@ -33,6 +29,10 @@
       height: 16px;
       margin-right: 6px;
       vertical-align: middle;
+    }
+    .search-box {
+      top: 10px;
+      right: 10px;
     }
   </style>
 </head>
@@ -73,11 +73,13 @@
     const parameterSelect = document.getElementById('parameterSelect');
     const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vROJntSYDQdg2vU1VTlMy8E-qOsSe9wr5_JMj1n1ks2wonNsk-JippjXmzizJJ9_BfgwMzzBV0Af50h/pub?gid=61075690&single=true&output=csv";
     const geojsonUrl = "https://calaneve.github.io/streammap/LBD_ReachCharacterization_GCSWGS84.geojson";
+    const subwatershedUrl = "https://calaneve.github.io/streammap/StreamGroupSubwatersheds.geojson";
 
     let gradeData = {};
     let gradeColumns = [];
     let geojsonLayer;
-    let highlightGroup = L.layerGroup().addTo(map);
+    let highlightedLayer;
+    let subwatershedLayer;
 
     function getColor(grade) {
       switch (grade) {
@@ -90,6 +92,19 @@
         case '': return 'gray';
         default: return 'gray';
       }
+    }
+
+    function getGroupColor(group) {
+      const colors = {
+        "Colorado River Headwaters": "#08dd6d",
+        "Colorado River Lower": "#ac49f9",
+        "Colorado River Mid": "#3e77b2",
+        "Colorado River Upper": "#f7a318",
+        "Fraser River Lower": "#05a16f",
+        "Fraser River Mid": "#b6e04c",
+        "Fraser River Upper": "#e7402c"
+      };
+      return colors[group] || "#aaaaaa";
     }
 
     async function fetchCSV() {
@@ -176,36 +191,40 @@
     document.getElementById('reachSearch').addEventListener('input', function () {
       const query = this.value.trim().toLowerCase();
 
-      highlightGroup.clearLayers();
-      if (!query || !geojsonLayer) return;
+      if (highlightedLayer) {
+        map.removeLayer(highlightedLayer);
+        highlightedLayer = null;
+      }
 
-      geojsonLayer.eachLayer(layer => {
-        const id = layer.feature.properties.reach_id;
-        if (id.toLowerCase().includes(query)) {
-          const highlight = L.geoJSON(layer.feature, {
-            style: {
-              color: 'blue',
-              weight: 6
-            },
-            onEachFeature: (feature, highlightLayer) => {
-              const row = gradeData[feature.properties.reach_id];
-              if (row) {
-                let popupContent = `<strong>Reach ID: ${feature.properties.reach_id}</strong><br><table style=\"border-collapse: collapse;\">`;
-                for (const key in row) {
-                  const val = row[key]?.trim() || 'No Data';
-                  const isSelected = key === parameterSelect.value;
-                  const keyStyled = isSelected ? `<strong style=\"color:blue;\">${key}</strong>` : key;
-                  const valStyled = isSelected ? `<strong style=\"color:blue;\">${val}</strong>` : val;
-                  popupContent += `<tr><td style=\"padding: 2px 6px;\">${keyStyled}</td><td style=\"padding: 2px 6px;\">=</td><td style=\"padding: 2px 6px;\">${valStyled}</td></tr>`;
-                }
-                popupContent += `</table>`;
-                highlightLayer.bindTooltip(popupContent, { sticky: true }).openTooltip();
+      if (!query) return;
+
+      const matchedFeatures = geojsonLayer.getLayers().filter(layer =>
+        layer.feature.properties.reach_id.toLowerCase().includes(query)
+      );
+
+      if (matchedFeatures.length > 0) {
+        highlightedLayer = L.geoJSON(matchedFeatures.map(l => l.feature), {
+          style: { color: 'blue', weight: 6 },
+          onEachFeature: (feature, layer) => {
+            const id = feature.properties.reach_id;
+            const record = gradeData[id];
+            if (!record) return;
+
+            let popupContent = `<strong>Reach ID: ${id}</strong><br><table style=\"border-collapse: collapse;\">`;
+            for (const key in record) {
+              if (key !== "reach" && key !== "color" && key !== "grade") {
+                const val = record[key]?.trim() || 'No Data';
+                const isSelected = key === parameterSelect.value;
+                const keyStyled = isSelected ? `<strong style=\"color:blue;\">${key}</strong>` : key;
+                const valStyled = isSelected ? `<strong style=\"color:blue;\">${val}</strong>` : val;
+                popupContent += `<tr><td style=\"padding: 2px 6px;\">${keyStyled}</td><td style=\"padding: 2px 6px;\">=</td><td style=\"padding: 2px 6px;\">${valStyled}</td></tr>`;
               }
             }
-          });
-          highlightGroup.addLayer(highlight);
-        }
-      });
+            popupContent += `</table>`;
+            layer.bindTooltip(popupContent, { sticky: true }).openTooltip();
+          }
+        }).addTo(map);
+      }
     });
 
     async function initialize() {
@@ -222,6 +241,23 @@
         map.fitBounds(ceaLayer.getBounds());
       });
 
+    fetch(subwatershedUrl)
+      .then(res => res.json())
+      .then(data => {
+        subwatershedLayer = L.geoJSON(data, {
+          style: feature => ({
+            color: getGroupColor(feature.properties.group),
+            weight: 2,
+            fillOpacity: 0.2
+          }),
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(`<strong>Group:</strong> ${feature.properties.group}`);
+          }
+        });
+
+        L.control.layers(null, {"Stream Group Subwatersheds": subwatershedLayer}, {collapsed: false}).addTo(map);
+      });
+
     parameterSelect.addEventListener('change', updateMap);
     document.querySelectorAll('.gradeFilter').forEach(cb =>
       cb.addEventListener('change', updateMap)
@@ -231,3 +267,4 @@
   </script>
 </body>
 </html>
+
