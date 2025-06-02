@@ -18,7 +18,7 @@
     #controls { top: 60px; right: 10px; }
     #legend { bottom: 10px; left: 10px; }
     #subwatershedToggle { bottom: 180px; left: 10px; }
-    #subLegend { bottom: 200px; left: 10px; display: none; }
+    #subLegend { bottom: 210px; left: 10px; display: none; }
     .search-box { top: 10px; right: 10px; }
     .legend-color {
       display: inline-block;
@@ -27,6 +27,25 @@
       margin-right: 6px;
       vertical-align: middle;
     }
+    #updateButton {
+  position: absolute;
+  top: 10px;
+  left: 200px;
+  z-index: 1001;
+  background: #007bff;
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: sans-serif;
+  font-size: 14px;
+}
+
+#updateButton:hover {
+  background: #0056b3;
+}
+
   </style>
 </head>
 <body>
@@ -70,6 +89,9 @@
     <div><span class="legend-color" style="background:red;"></span> F</div>
     <div><span class="legend-color" style="background:gray;"></span> No Data</div>
   </div>
+
+<div id="updateButton" onclick="handleUpdate()">Update Data</div>
+<div id="loading" style="display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1001;background:white;padding:8px;border:1px solid #ccc;font-family:sans-serif;">Updating...</div>
 
   <div id="map"></div>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -199,6 +221,15 @@
     parameterSelect.addEventListener('change', updateMap);
     document.querySelectorAll('.gradeFilter').forEach(cb => cb.addEventListener('change', updateMap));
     fetchCSV().then(updateMap);
+
+    async function handleUpdate() {
+  document.getElementById('loading').style.display = 'block';
+  const previousParam = parameterSelect.value;
+  await fetchCSV();
+  parameterSelect.value = previousParam; // preserve selection
+  await updateMap();
+  document.getElementById('loading').style.display = 'none';
+}
   </script>
 </body>
 </html>
