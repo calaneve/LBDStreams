@@ -16,6 +16,7 @@
       font-family: sans-serif;
     }
     #controls {
+      right: 20px
       top: 10px;
       left: 10px;
     }
@@ -59,7 +60,7 @@
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([39.6, -104.8], 10);
+    const map = L.map('map').setView([40.1, -105.87], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     const parameterSelect = document.getElementById('parameterSelect');
@@ -153,6 +154,14 @@
       await fetchCSV();
       await updateMap();
     }
+// Add CEA Boundary to the map
+fetch("https://calaneve.github.io/streammap/LBD_CEA_Boundary.geojson")
+  .then(res => res.json())
+  .then(data => {
+    ceaLayer = L.geoJSON(data, {
+      style: { color: "purple", weight: 2, fillOpacity: 0, fill: false }
+    }).addTo(map);
+  });
 
     parameterSelect.addEventListener('change', updateMap);
     document.querySelectorAll('.gradeFilter').forEach(cb =>
