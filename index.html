@@ -15,6 +15,10 @@
       border: 1px solid #ccc;
       font-family: sans-serif;
     }
+    .search-box {
+      top: 10px;
+      right: 10px;
+    }
     #controls {
       top: 60px;
       right: 10px;
@@ -30,18 +34,13 @@
       margin-right: 6px;
       vertical-align: middle;
     }
-    .search-box {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 1000;
-      background: white;
-      padding: 6px;
-      border: 1px solid #ccc;
-    }
   </style>
 </head>
 <body>
+  <div class="search-box">
+    <input id="reachSearch" type="text" placeholder="Search Reach ID" style="width:160px; padding:4px;">
+  </div>
+
   <div id="controls">
     <label for="parameterSelect"><strong>Select Parameter:</strong></label><br>
     <select id="parameterSelect"></select><br><br>
@@ -64,10 +63,6 @@
     <div><span class="legend-color" style="background:gray;"></span> No Data</div>
   </div>
 
-  <div class="search-box">
-    <input id="reachSearch" type="text" placeholder="Search Reach ID" style="width:160px; padding:4px;">
-</div>
-
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -82,7 +77,7 @@
     let gradeData = {};
     let gradeColumns = [];
     let geojsonLayer;
-    let highlightedLayer;
+    let highlightGroup = L.layerGroup().addTo(map);
 
     function getColor(grade) {
       switch (grade) {
@@ -179,30 +174,38 @@
     }
 
     document.getElementById('reachSearch').addEventListener('input', function () {
-      const query = this.value.trim();
+      const query = this.value.trim().toLowerCase();
 
-      if (highlightedLayer) {
-        map.removeLayer(highlightedLayer);
-        highlightedLayer = null;
-      }
+      highlightGroup.clearLayers();
+      if (!query || !geojsonLayer) return;
 
-      if (!query) return;
-
-      const selectedFeature = geojsonLayer.getLayers().find(layer => {
-        return layer.feature.properties.reach_id === query;
+      geojsonLayer.eachLayer(layer => {
+        const id = layer.feature.properties.reach_id;
+        if (id.toLowerCase().includes(query)) {
+          const highlight = L.geoJSON(layer.feature, {
+            style: {
+              color: 'blue',
+              weight: 6
+            },
+            onEachFeature: (feature, highlightLayer) => {
+              const row = gradeData[feature.properties.reach_id];
+              if (row) {
+                let popupContent = `<strong>Reach ID: ${feature.properties.reach_id}</strong><br><table style=\"border-collapse: collapse;\">`;
+                for (const key in row) {
+                  const val = row[key]?.trim() || 'No Data';
+                  const isSelected = key === parameterSelect.value;
+                  const keyStyled = isSelected ? `<strong style=\"color:blue;\">${key}</strong>` : key;
+                  const valStyled = isSelected ? `<strong style=\"color:blue;\">${val}</strong>` : val;
+                  popupContent += `<tr><td style=\"padding: 2px 6px;\">${keyStyled}</td><td style=\"padding: 2px 6px;\">=</td><td style=\"padding: 2px 6px;\">${valStyled}</td></tr>`;
+                }
+                popupContent += `</table>`;
+                highlightLayer.bindTooltip(popupContent, { sticky: true }).openTooltip();
+              }
+            }
+          });
+          highlightGroup.addLayer(highlight);
+        }
       });
-
-      if (selectedFeature) {
-        highlightedLayer = L.geoJSON(selectedFeature.feature, {
-          style: {
-            color: 'blue',
-            weight: 6
-          }
-        }).addTo(map);
-
-        selectedFeature.openPopup();
-        map.fitBounds(highlightedLayer.getBounds());
-      }
     });
 
     async function initialize() {
@@ -228,4 +231,3 @@
   </script>
 </body>
 </html>
-
