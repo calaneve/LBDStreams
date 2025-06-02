@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     #map { height: 100vh; }
-    #controls, #legend, .search-box {
+    #controls, #legend, .search-box, #subwatershedToggle, #subLegend {
       position: absolute;
       z-index: 1000;
       background: white;
@@ -15,24 +15,17 @@
       border: 1px solid #ccc;
       font-family: sans-serif;
     }
-    #controls {
-      top: 90px;
-      right: 10px;
-    }
-    #legend {
-      bottom: 10px;
-      left: 10px;
-    }
+    #controls { top: 60px; right: 10px; }
+    #legend { bottom: 10px; left: 10px; }
+    #subwatershedToggle { bottom: 130px; left: 10px; }
+    #subLegend { bottom: 200px; left: 10px; display: none; }
+    .search-box { top: 10px; right: 10px; }
     .legend-color {
       display: inline-block;
       width: 16px;
       height: 16px;
       margin-right: 6px;
       vertical-align: middle;
-    }
-    .search-box {
-      top: 10px;
-      right: 10px;
     }
   </style>
 </head>
@@ -53,6 +46,21 @@
     <label><input type="checkbox" class="gradeFilter" value="No Data" checked> No Data</label>
   </div>
 
+  <div id="subwatershedToggle">
+    <label><input type="checkbox" id="toggleSubwatersheds"> Subwatersheds</label>
+  </div>
+
+  <div id="subLegend">
+    <strong>Subwatershed Groups</strong><br>
+    <div><span class="legend-color" style="background:#08dd6d;"></span> Colorado River Headwaters</div>
+    <div><span class="legend-color" style="background:#ac49f9;"></span> Colorado River Lower</div>
+    <div><span class="legend-color" style="background:#3e77b2;"></span> Colorado River Mid</div>
+    <div><span class="legend-color" style="background:#f7a318;"></span> Colorado River Upper</div>
+    <div><span class="legend-color" style="background:#05a16f;"></span> Fraser River Lower</div>
+    <div><span class="legend-color" style="background:#b6e04c;"></span> Fraser River Mid</div>
+    <div><span class="legend-color" style="background:#e7402c;"></span> Fraser River Upper</div>
+  </div>
+
   <div id="legend">
     <strong>Grade Legend</strong><br>
     <div><span class="legend-color" style="background:green;"></span> A</div>
@@ -64,7 +72,6 @@
   </div>
 
   <div id="map"></div>
-
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
     const map = L.map('map').setView([40.1, -105.87], 13);
@@ -75,23 +82,13 @@
     const geojsonUrl = "https://calaneve.github.io/streammap/LBD_ReachCharacterization_GCSWGS84.geojson";
     const subwatershedUrl = "https://calaneve.github.io/streammap/StreamGroupSubwatersheds.geojson";
 
-    let gradeData = {};
-    let gradeColumns = [];
-    let geojsonLayer;
-    let highlightedLayer;
-    let subwatershedLayer;
+    let gradeData = {}, gradeColumns = [], geojsonLayer, highlightedLayer, subwatershedLayer;
 
     function getColor(grade) {
-      switch (grade) {
-        case 'A': return 'green';
-        case 'B': return 'lightgreen';
-        case 'C': return 'yellow';
-        case 'D': return 'orange';
-        case 'F': return 'red';
-        case 'No Data':
-        case '': return 'gray';
-        default: return 'gray';
-      }
+      return {
+        'A': 'green', 'B': 'lightgreen', 'C': 'yellow',
+        'D': 'orange', 'F': 'red', 'No Data': 'gray', '': 'gray'
+      }[grade] || 'gray';
     }
 
     function getGroupColor(group) {
@@ -110,30 +107,21 @@
     async function fetchCSV() {
       const response = await fetch(csvUrl);
       const text = await response.text();
-      const rows = text.trim().split('\n').map(row => row.split(','));
+      const rows = text.trim().split('\n').map(r => r.split(','));
       const headers = rows[0].map(h => h.trim());
-
       gradeColumns = headers.slice(2);
-
       const data = rows.slice(1).map(row => {
         const obj = {};
         headers.forEach((key, i) => obj[key] = row[i]?.trim());
         return obj;
       });
-
-      gradeData = {};
-      data.forEach(row => {
-        gradeData[row.reach_id] = row;
-      });
-
-      parameterSelect.innerHTML = gradeColumns.map(col =>
-        `<option value="${col}">${col}</option>`
-      ).join('');
+      data.forEach(row => gradeData[row.reach_id] = row);
+      parameterSelect.innerHTML = gradeColumns.map(col => `<option value="${col}">${col}</option>`).join('');
     }
 
-    async function loadGeoJSON() {
-      const response = await fetch(geojsonUrl);
-      return await response.json();
+    async function loadGeoJSON(url) {
+      const res = await fetch(url);
+      return res.json();
     }
 
     function getActiveGradeFilters() {
@@ -142,128 +130,69 @@
 
     async function updateMap() {
       if (geojsonLayer) map.removeLayer(geojsonLayer);
-
       const selectedParam = parameterSelect.value;
-      const activeGrades = getActiveGradeFilters();
-      const geojson = await loadGeoJSON();
+      const grades = getActiveGradeFilters();
+      const geojson = await loadGeoJSON(geojsonUrl);
 
       geojsonLayer = L.geoJSON(geojson, {
-        filter: feature => {
-          const row = gradeData[feature.properties.reach_id];
-          if (!row) return false;
-          const grade = row[selectedParam]?.trim() || 'No Data';
-          return activeGrades.includes(grade);
-        },
-        style: feature => {
-          const row = gradeData[feature.properties.reach_id];
-          const grade = row?.[selectedParam]?.trim() || 'No Data';
-          return {
-            color: getColor(grade),
-            weight: 6
-          };
-        },
+        filter: f => grades.includes((gradeData[f.properties.reach_id]?.[selectedParam] || 'No Data').trim()),
+        style: f => ({ color: getColor((gradeData[f.properties.reach_id]?.[selectedParam] || 'No Data').trim()), weight: 6 }),
         onEachFeature: (feature, layer) => {
-          layer.on("mouseover", function () {
-            const id = feature.properties.reach_id;
-            const record = gradeData[id];
-            if (!record) return;
-
-            let popupContent = `<strong>Reach ID: ${id}</strong><br><table style=\"border-collapse: collapse;\">`;
-            for (const key in record) {
+          layer.on("mouseover", () => {
+            const rec = gradeData[feature.properties.reach_id];
+            if (!rec) return;
+            let content = `<strong>Reach ID: ${feature.properties.reach_id}</strong><br><table style="border-collapse: collapse;">`;
+            for (const key in rec) {
               if (key !== "reach" && key !== "color" && key !== "grade") {
-                const val = record[key]?.trim() || 'No Data';
-                const isSelected = key === parameterSelect.value;
-                const keyStyled = isSelected ? `<strong style=\"color:blue;\">${key}</strong>` : key;
-                const valStyled = isSelected ? `<strong style=\"color:blue;\">${val}</strong>` : val;
-                popupContent += `<tr><td style=\"padding: 2px 6px;\">${keyStyled}</td><td style=\"padding: 2px 6px;\">=</td><td style=\"padding: 2px 6px;\">${valStyled}</td></tr>`;
+                const val = rec[key] || 'No Data';
+                const highlight = key === parameterSelect.value;
+                content += `<tr><td style="padding:2px 6px;">${highlight ? `<strong style='color:blue;'>${key}</strong>` : key}</td><td>=</td><td style="padding:2px 6px;">${highlight ? `<strong style='color:blue;'>${val}</strong>` : val}</td></tr>`;
               }
             }
-            popupContent += `</table>`;
-            layer.bindTooltip(popupContent, { sticky: true }).openTooltip();
+            layer.bindTooltip(content + '</table>', { sticky: true }).openTooltip();
           });
-          layer.on("mouseout", function () {
-            layer.closeTooltip();
-          });
+          layer.on("mouseout", () => layer.closeTooltip());
         }
       }).addTo(map);
     }
 
     document.getElementById('reachSearch').addEventListener('input', function () {
       const query = this.value.trim().toLowerCase();
-
       if (highlightedLayer) {
         map.removeLayer(highlightedLayer);
         highlightedLayer = null;
       }
-
       if (!query) return;
+      const matches = geojsonLayer.getLayers().filter(l => l.feature.properties.reach_id.toLowerCase().includes(query));
+      highlightedLayer = L.geoJSON(matches.map(m => m.feature), { style: { color: 'blue', weight: 6 } }).addTo(map);
+      matches.forEach(m => m.openTooltip());
+    });
 
-      const matchedFeatures = geojsonLayer.getLayers().filter(layer =>
-        layer.feature.properties.reach_id.toLowerCase().includes(query)
-      );
+    fetch(subwatershedUrl).then(res => res.json()).then(data => {
+      subwatershedLayer = L.geoJSON(data, {
+        style: f => ({ color: getGroupColor(f.properties.group), weight: 2, fillOpacity: 0.2 }),
+        onEachFeature: (f, l) => l.bindPopup(`<strong>Group:</strong> ${f.properties.group}`)
+      });
+    });
 
-      if (matchedFeatures.length > 0) {
-        highlightedLayer = L.geoJSON(matchedFeatures.map(l => l.feature), {
-          style: { color: 'blue', weight: 6 },
-          onEachFeature: (feature, layer) => {
-            const id = feature.properties.reach_id;
-            const record = gradeData[id];
-            if (!record) return;
-
-            let popupContent = `<strong>Reach ID: ${id}</strong><br><table style=\"border-collapse: collapse;\">`;
-            for (const key in record) {
-              if (key !== "reach" && key !== "color" && key !== "grade") {
-                const val = record[key]?.trim() || 'No Data';
-                const isSelected = key === parameterSelect.value;
-                const keyStyled = isSelected ? `<strong style=\"color:blue;\">${key}</strong>` : key;
-                const valStyled = isSelected ? `<strong style=\"color:blue;\">${val}</strong>` : val;
-                popupContent += `<tr><td style=\"padding: 2px 6px;\">${keyStyled}</td><td style=\"padding: 2px 6px;\">=</td><td style=\"padding: 2px 6px;\">${valStyled}</td></tr>`;
-              }
-            }
-            popupContent += `</table>`;
-            layer.bindTooltip(popupContent, { sticky: true }).openTooltip();
-          }
-        }).addTo(map);
+    document.getElementById('toggleSubwatersheds').addEventListener('change', function () {
+      const show = this.checked;
+      if (show) {
+        map.addLayer(subwatershedLayer);
+        document.getElementById('subLegend').style.display = 'block';
+      } else {
+        map.removeLayer(subwatershedLayer);
+        document.getElementById('subLegend').style.display = 'none';
       }
     });
 
-    async function initialize() {
-      await fetchCSV();
-      await updateMap();
-    }
-
     fetch("https://calaneve.github.io/streammap/LBD_CEA_Boundary.geojson")
       .then(res => res.json())
-      .then(data => {
-        const ceaLayer = L.geoJSON(data, {
-          style: { color: "purple", weight: 2, fillOpacity: 0, fill: false }
-        }).addTo(map);
-        map.fitBounds(ceaLayer.getBounds());
-      });
-
-    fetch(subwatershedUrl)
-      .then(res => res.json())
-      .then(data => {
-        subwatershedLayer = L.geoJSON(data, {
-          style: feature => ({
-            color: getGroupColor(feature.properties.group),
-            weight: 2,
-            fillOpacity: 0.2
-          }),
-          onEachFeature: (feature, layer) => {
-            layer.bindPopup(`<strong>Group:</strong> ${feature.properties.group}`);
-          }
-        });
-
-        L.control.layers(null, {"Stream Group Subwatersheds": subwatershedLayer}, {collapsed: false}).addTo(map);
-      });
+      .then(data => map.fitBounds(L.geoJSON(data).addTo(map).getBounds()));
 
     parameterSelect.addEventListener('change', updateMap);
-    document.querySelectorAll('.gradeFilter').forEach(cb =>
-      cb.addEventListener('change', updateMap)
-    );
-
-    initialize();
+    document.querySelectorAll('.gradeFilter').forEach(cb => cb.addEventListener('change', updateMap));
+    fetchCSV().then(updateMap);
   </script>
 </body>
 </html>
