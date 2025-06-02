@@ -17,7 +17,7 @@
     }
     #controls { top: 60px; right: 10px; }
     #legend { bottom: 10px; left: 10px; }
-    #subwatershedToggle { bottom: 130px; left: 10px; }
+    #subwatershedToggle { bottom: 180px; left: 10px; }
     #subLegend { bottom: 200px; left: 10px; display: none; }
     .search-box { top: 10px; right: 10px; }
     .legend-color {
@@ -187,8 +187,14 @@
     });
 
     fetch("https://calaneve.github.io/streammap/LBD_CEA_Boundary.geojson")
-      .then(res => res.json())
-      .then(data => map.fitBounds(L.geoJSON(data).addTo(map).getBounds()));
+  .then(res => res.json())
+  .then(data => {
+    const ceaLayer = L.geoJSON(data, {
+      style: { color: "purple", weight: 2, fill: false, fillOpacity: 0 }
+    }).addTo(map);
+    map.fitBounds(ceaLayer.getBounds());
+  });
+
 
     parameterSelect.addEventListener('change', updateMap);
     document.querySelectorAll('.gradeFilter').forEach(cb => cb.addEventListener('change', updateMap));
